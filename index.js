@@ -20,10 +20,9 @@ app.get('/',(req,res)=>{
 })
 
 
-app.get('/random', async (req, res) => {
+async function download(url){
     try {
         // The URL of the website
-        const url = 'https://hentaibar.com/random_video';
 
         // Make an HTTP request to the website
         const response = await axios.get(url);
@@ -59,7 +58,7 @@ app.get('/random', async (req, res) => {
                 console.log(`MP4 file downloaded and saved to: ${mp4FilePath}`);
 
                 // Send the random filename as a response
-                res.send({thum:thumbnailUrl, file: 'https://hentaibar.onrender.com/'+randomFilename, anme: name, upload_date:uploadDate,duration:duration});
+                res.send({thum:thumbnailUrl, file: 'https://hentaibar.onrender.com/'+randomFilename, name: name, upload_date:uploadDate,duration:duration});
 
                 // Schedule a function to delete the file after 5 minutes
                 setTimeout(() => {
@@ -80,6 +79,11 @@ app.get('/random', async (req, res) => {
         console.error('Error fetching the website:', error.message);
         res.status(500).send('Internal Server Error');
     }
+}
+
+app.get('/random', async (req, res) => {
+    const url = 'https://hentaibar.com/random_video';
+    download(url);
 });
 
 // Serve the downloaded video file by filename
