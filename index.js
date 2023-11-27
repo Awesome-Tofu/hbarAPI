@@ -100,7 +100,8 @@ app.get('/:filename', (req, res) => {
     if (fs.existsSync(videoPath)) {
         // Set headers for the response
         res.setHeader('Content-Type', 'video/mp4');
-        res.download(videoPath, requestedFilename);
+        // res.download(videoPath, requestedFilename);
+        res.sendFile(videoPath);
     } else {
         res.status(404).send('Video not found');
     }
