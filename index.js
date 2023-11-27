@@ -16,7 +16,7 @@ const generateRandomFilename = () => {
 
 
 app.get('/',(req,res)=>{
-    res.send('/random')
+    res.json({redirect:'/random'})
 })
 
 
@@ -64,7 +64,7 @@ app.get('/random', async (req, res) => {
                 console.log(`MP4 file downloaded and saved to: ${mp4FilePath}`);
 
                 // Send the random filename as a response
-                res.send({ filename: randomFilename });
+                res.send({ file: 'https://hentaibar.onrender.com/'+randomFilename });
 
                 // Schedule a function to delete the file after 5 minutes
                 setTimeout(() => {
