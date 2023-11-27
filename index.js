@@ -20,7 +20,7 @@ app.get('/',(req,res)=>{
 })
 
 
-async function download(url){
+async function download(url, res){
     try {
         // The URL of the website
 
@@ -82,8 +82,13 @@ async function download(url){
 }
 
 app.get('/random', async (req, res) => {
-    const url = 'https://hentaibar.com/random_video';
-    download(url);
+    try {
+        const url = "https://hentaibar.com/random_video";
+        await download(url, res);
+    } catch (error) {
+        res.status(500).json({err:error.message});
+    }
+
 });
 
 // Serve the downloaded video file by filename
