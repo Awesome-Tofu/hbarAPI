@@ -42,11 +42,6 @@ app.get('/random', async (req, res) => {
             const duration = jsonContent.duration;
 
 
-            console.log('Name:', name);
-            console.log('Upload Date:', uploadDate);
-            console.log('Duration :', duration);
-            console.log('Thumbnail URL:', thumbnailUrl);
-            console.log('Content URL:', contentUrl);
 
             // Generate a random filename
             const randomFilename = generateRandomFilename();
@@ -64,7 +59,7 @@ app.get('/random', async (req, res) => {
                 console.log(`MP4 file downloaded and saved to: ${mp4FilePath}`);
 
                 // Send the random filename as a response
-                res.send({ file: 'https://hentaibar.onrender.com/'+randomFilename });
+                res.send({thum:thumbnailUrl, file: 'https://hentaibar.onrender.com/'+randomFilename, anme: name, upload_date:uploadDate,duration:duration});
 
                 // Schedule a function to delete the file after 5 minutes
                 setTimeout(() => {
