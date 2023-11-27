@@ -144,7 +144,7 @@ const formatDuration = (durationString) => {
 
 
 app.get('/', (req, res) => {
-    res.json({ rendom: '/random', search:'/search/overflow/1',tags:'/tags', });
+    res.json({ rendom: '/random', search:'/search/overflow/1',tags:'/tags',getTag: '/tags/loli/1'});
 });
 
 app.get('/random', async (req, res) => {
