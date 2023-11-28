@@ -144,7 +144,7 @@ const formatDuration = (durationString) => {
 
 
 app.get('/', (req, res) => {
-    res.json({ rendom: '/random', search:'/search/overflow/1',tags:'/tags',getTag: '/tags/loli/1'});
+    res.json({ random: '/random', search:'/search/overflow/1',tags:'/tags',getTag: '/tags/loli/1',trending:'/trending/1',popular:'/popular/1',top_rated:'/top-rated/1',longest:'/longest/1',most_commented:'/most-commented/1'});
 });
 
 app.get('/random', async (req, res) => {
@@ -206,6 +206,67 @@ app.get('/watch',async(req,res)=>{
         res.status(500).json({ err: error.message });
     }
 })
+
+app.get('/trending/:page',async(req,res)=>{
+    try {
+        const page = req.params.page;
+        const searchUrl = `${mainUrl}${page}`;
+
+        const searchResults = await scrapeSearchResults(searchUrl);
+        res.json({ results: searchResults });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    }
+})
+
+app.get('/popular/:page',async(req,res)=>{
+    try {
+        const page = req.params.page;
+        const searchUrl = `${mainUrl}most-popular/${page}`;
+
+        const searchResults = await scrapeSearchResults(searchUrl);
+        res.json({ results: searchResults });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    }
+})
+
+app.get('/top-rated/:page',async(req,res)=>{
+    try {
+        const page = req.params.page;
+        const searchUrl = `${mainUrl}top-rated/${page}`;
+
+        const searchResults = await scrapeSearchResults(searchUrl);
+        res.json({ results: searchResults });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    }
+})
+
+app.get('/longest/:page',async(req,res)=>{
+    try {
+        const page = req.params.page;
+        const searchUrl = `${mainUrl}longest/${page}`;
+
+        const searchResults = await scrapeSearchResults(searchUrl);
+        res.json({ results: searchResults });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    }
+})
+
+app.get('/most-commented/:page',async(req,res)=>{
+    try {
+        const page = req.params.page;
+        const searchUrl = `${mainUrl}most-commented/${page}`;
+
+        const searchResults = await scrapeSearchResults(searchUrl);
+        res.json({ results: searchResults });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    }
+})
+
 
 app.get('/:filename', (req, res) => {
     const requestedFilename = req.params.filename;
