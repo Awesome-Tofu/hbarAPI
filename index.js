@@ -15,11 +15,11 @@ const mainUrl = process.env.MAIN_URL;
 // Function to generate a random filename
 const generateRandomFilename = () => {
     const randomBytes = crypto.randomBytes(4).toString('hex');
-    return `video_${randomBytes}.mp4`;
+    return  path.join('/tmp', `video_${randomBytes}.mp4`);
 };
 
 app.get('/delall', (req, res) => {
-    const directoryPath = __dirname;
+    const directoryPath = '/tmp';
 
     // Filter files to include only MP4 files
     const mp4Files = fs.readdirSync(directoryPath).filter(file => file.endsWith('.mp4'));
@@ -44,7 +44,7 @@ const scheduleFileDeletion = (filePath) => {
                 console.log(`File deleted: ${filePath}`);
             }
         });
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+    }, 10 * 60 * 1000); // 5 minutes in milliseconds
 };
 
 
@@ -107,7 +107,7 @@ const download = async (url, res) => {
                 // Send the response with details
                 res.json({
                     thumbnailUrl,
-                    file: `${hostUrl}${randomFilename}`,
+                    file: `${hostUrl}${randomFilename.replace('/tmp/', '')}`,
                     name,
                     upload_date: uploadDate,
                     duration,
@@ -270,7 +270,7 @@ app.get('/most-commented/:page',async(req,res)=>{
 
 app.get('/:filename', (req, res) => {
     const requestedFilename = req.params.filename;
-    const videoPath = path.resolve(requestedFilename);
+    const videoPath = path.resolve('/tmp', requestedFilename);
 
     if (fs.existsSync(videoPath)) {
         res.setHeader('Content-Type', 'video/mp4');
