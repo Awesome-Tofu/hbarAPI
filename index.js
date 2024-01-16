@@ -6,7 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 require("dotenv").config();
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 const hostUrl = process.env.HOSTURL;
 const mainUrl = process.env.MAIN_URL;
