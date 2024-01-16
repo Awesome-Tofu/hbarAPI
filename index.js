@@ -2,50 +2,69 @@ const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
 require("dotenv").config();
 const app = express();
 const port = 3000;
+const mongodb = require('mongodb');
+const MongoClient = mongodb.MongoClient;
+const GridFSBucket = mongodb.GridFSBucket;
 
 const hostUrl = process.env.HOSTURL;
 const mainUrl = process.env.MAIN_URL;
 
+let gfs;
+let dtb;
+
+const MONGODB_URI = 'mongodb+srv://kazuha321:kazuha321@cluster0.oafdfob.mongodb.net/?retryWrites=true&w=majority'
+async function connectToDatabase() {
+    try {
+        const client = await MongoClient.connect(MONGODB_URI);
+        console.log('Connected to Database');
+        dtb = client.db('HBAR');
+        gfs = new mongodb.GridFSBucket(dtb, {
+        bucketName: 'uploads'
+        });
+        return {'dtb':dtb, 'gfs':gfs};
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 
 // Function to generate a random filename
-const generateRandomFilename = () => {
-    const randomBytes = crypto.randomBytes(4).toString('hex');
-    return  path.join('/tmp', `video_${randomBytes}.mp4`);
-};
+// function generateRandomFilename() {
+//     return `${Date.now()}-${Math.round(Math.random() * 1E9)}.mp4`;
+// }
 
-app.get('/delall', (req, res) => {
-    const directoryPath = '/tmp';
+app.get('/delall', async (req, res) => {
+    try {
+        const client = await MongoClient.connect(MONGODB_URI);
+        const dtb = client.db('HBAR');
+        const collections = await dtb.listCollections().toArray();
 
-    // Filter files to include only MP4 files
-    const mp4Files = fs.readdirSync(directoryPath).filter(file => file.endsWith('.mp4'));
+        // Fetch all files from the 'uploads' collection
+        const files = await dtb.collection('uploads.files').find().toArray();
 
-    // Delete each MP4 file
-    mp4Files.forEach(file => {
-        const filePath = path.join(directoryPath, file);
-        fs.unlinkSync(filePath);
-        console.log(`Deleted file: ${filePath}`);
-    });
+        // If no files are present, send a response saying 'No videos present'
+        if (files.length === 0) {
+            return res.json({ message: 'No videos present' });
+        }
 
-    res.json({ status: `Cleared ${mp4Files.join(', ')}` });
+        // Store the names of the files in an array
+        const fileNames = files.map(file => file.filename);
+
+        // Drop all collections
+        for (let collection of collections) {
+            await dtb.collection(collection.name).drop();
+        }
+
+        res.send({ message: 'All collections deleted', deletedVideos: fileNames });
+    } catch (err) {
+        console.log(err);
+        res.status(500).send(err);
+    }
 });
 
-// Function to handle file deletion after 5 minutes
-const scheduleFileDeletion = (filePath) => {
-    setTimeout(() => {
-        fs.unlink(filePath, (err) => {
-            if (err) {
-                console.error(`Error deleting file: ${filePath}`, err);
-            } else {
-                console.log(`File deleted: ${filePath}`);
-            }
-        });
-    }, 10 * 60 * 1000); // 5 minutes in milliseconds
-};
 
 
 // Function to scrape search results
@@ -80,6 +99,11 @@ const scrapeSearchResults = async (searchUrl) => {
 
 
 const download = async (url, res) => {
+    const dtbclient = await connectToDatabase();
+    const dtb = dtbclient.dtb;
+    if (!dtb) {
+        return res.status(500).json({ error: 'Database not initialized' });
+    }
     try {
         const response = await axios.get(url);
         const $ = cheerio.load(response.data);
@@ -93,28 +117,43 @@ const download = async (url, res) => {
             const uploadDate = jsonContent.uploadDate;
             const duration = formatDuration(jsonContent.duration);
 
-            const randomFilename = generateRandomFilename();
-            const mp4FilePath = path.resolve(randomFilename);
+            const formattedFilename = `vid${name.replace(/ /g, '-')}.mp4`;
 
-            const mp4Response = await axios.get(contentUrl, { responseType: 'stream' });
-            const mp4WriteStream = fs.createWriteStream(mp4FilePath);
+            const bucket = new GridFSBucket(dtb, {
+                bucketName: 'uploads'
+            });
 
-            mp4Response.data.pipe(mp4WriteStream);
-
-            mp4WriteStream.on('finish', () => {
-                console.log(`MP4 file downloaded and saved to: ${mp4FilePath}`);
-
-                // Send the response with details
-                res.json({
+            // Check if file already exists
+            const files = await bucket.find({ filename: formattedFilename }).toArray();
+            if (files.length > 0) {
+                console.log('File already exists');
+                return res.json({
                     thumbnailUrl,
-                    file: `${hostUrl}${randomFilename.replace('/tmp/', '')}`,
+                    file: `${hostUrl}${formattedFilename}`,
                     name,
                     upload_date: uploadDate,
                     duration,
                 });
+            }
 
-                // Schedule file deletion after 5 minutes
-                scheduleFileDeletion(mp4FilePath);
+            // If file doesn't exist, download and upload it
+            const mp4Response = await axios.get(contentUrl, { responseType: 'stream' });
+            const uploadStream = bucket.openUploadStream(formattedFilename);
+
+            mp4Response.data.pipe(uploadStream).on('error', (error) => {
+                console.error('Error uploading file: ', error);
+                res.status(500).json({ error: 'Error uploading file' });
+            }).on('finish', () => {
+                console.log(`MP4 file downloaded and saved to: ${formattedFilename}`);
+
+                // Send the response with details
+                res.json({
+                    thumbnailUrl,
+                    file: `${hostUrl}${formattedFilename}`,
+                    name,
+                    upload_date: uploadDate,
+                    duration,
+                });
             });
         } else {
             console.log('Script content not found');
@@ -141,7 +180,25 @@ const formatDuration = (durationString) => {
     return formattedDuration;
 };
 
-
+//Upload
+app.post('/upload', async (req, res) => {
+    const dtbclient = await connectToDatabase();
+    const dtb = dtbclient.dtb;
+    const bucket = new GridFSBucket(dtb, {
+      bucketName: 'uploads'
+    });
+  
+    const videoStream = fs.createReadStream(req.file.path);
+    const uploadStream = bucket.openUploadStream(req.file.originalname);
+  
+    videoStream.pipe(uploadStream).on('error', (error) => {
+      console.error('Error uploading file: ', error);
+      res.status(500).json({ error: 'Error uploading file' });
+    }).on('finish', () => {
+      console.log('File upload successful');
+      res.json({ file: req.file });
+    });
+  });
 
 app.get('/', (req, res) => {
     res.json({ random: '/random', search:'/search/overflow/1',tags:'/tags',getTag: '/tags/loli/1',trending:'/trending/1',popular:'/popular/1',top_rated:'/top-rated/1',longest:'/longest/1',most_commented:'/most-commented/1'});
@@ -268,16 +325,29 @@ app.get('/most-commented/:page',async(req,res)=>{
 })
 
 
-app.get('/:filename', (req, res) => {
-    const requestedFilename = req.params.filename;
-    const videoPath = path.resolve('/tmp', requestedFilename);
-
-    if (fs.existsSync(videoPath)) {
-        res.setHeader('Content-Type', 'video/mp4');
-        res.sendFile(videoPath);
-    } else {
-        res.status(404).send('Video not found');
+app.get('/:filename', async (req, res) => {
+    const dtbclient = await connectToDatabase();
+    const gfs = dtbclient.gfs;
+    if (!gfs) {
+        return res.status(500).send({ error: 'Server error' });
     }
+
+    const downloadStream = gfs.openDownloadStreamByName(req.params.filename);
+
+    downloadStream.on('data', (chunk) => {
+      res.write(chunk);
+    });
+
+    downloadStream.on('error', () => {
+      res.sendStatus(404);
+    });
+
+    downloadStream.on('end', () => {
+      res.end();
+    });
+
+    // Set the Content-Type header
+    res.set('Content-Type', 'video/mp4');
 });
 
 app.listen(port, () => {
